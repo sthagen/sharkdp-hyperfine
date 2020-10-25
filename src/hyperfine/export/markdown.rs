@@ -5,7 +5,7 @@ use crate::hyperfine::internal::{compute_relative_speed, BenchmarkResultWithRela
 use crate::hyperfine::types::BenchmarkResult;
 use crate::hyperfine::units::Unit;
 
-use std::io::Result;
+use std::io::{Error, ErrorKind, Result};
 
 #[derive(Default)]
 pub struct MarkdownExporter {}
@@ -23,15 +23,20 @@ impl Exporter for MarkdownExporter {
             Unit::Second
         };
 
-        let annotated_results = compute_relative_speed(results);
+        if let Some(annotated_results) = compute_relative_speed(results) {
+            let mut destination = start_table(unit);
 
-        let mut destination = start_table(unit);
+            for result in annotated_results {
+                add_table_row(&mut destination, &result, unit);
+            }
 
-        for result in annotated_results {
-            add_table_row(&mut destination, &result, unit);
+            Ok(destination)
+        } else {
+            Err(Error::new(
+                ErrorKind::Other,
+                "Relative speed comparison is not available for Markdown export.",
+            ))
         }
-
-        Ok(destination)
     }
 }
 
@@ -82,6 +87,7 @@ fn add_table_row(dest: &mut Vec<u8>, entry: &BenchmarkResultWithRelativeSpeed, u
 /// the units for all entries when the time unit is not given.
 #[test]
 fn test_markdown_format_ms() {
+    use std::collections::BTreeMap;
     let exporter = MarkdownExporter::default();
 
     let mut timing_results = vec![];
@@ -96,7 +102,7 @@ fn test_markdown_format_ms() {
         0.1023,              // min
         0.1080,              // max
         vec![0.1, 0.1, 0.1], // times
-        None,                // parameter
+        BTreeMap::new(),     // parameter
     ));
 
     timing_results.push(BenchmarkResult::new(
@@ -109,7 +115,7 @@ fn test_markdown_format_ms() {
         2.0020,              // min
         2.0080,              // max
         vec![2.0, 2.0, 2.0], // times
-        None,                // parameter
+        BTreeMap::new(),     // parameter
     ));
 
     let formatted = String::from_utf8(exporter.serialize(&timing_results, None).unwrap()).unwrap();
@@ -129,6 +135,7 @@ fn test_markdown_format_ms() {
 /// the units for all entries when the time unit is not given.
 #[test]
 fn test_markdown_format_s() {
+    use std::collections::BTreeMap;
     let exporter = MarkdownExporter::default();
 
     let mut timing_results = vec![];
@@ -143,7 +150,7 @@ fn test_markdown_format_s() {
         2.0020,              // min
         2.0080,              // max
         vec![2.0, 2.0, 2.0], // times
-        None,                // parameter
+        BTreeMap::new(),     // parameter
     ));
 
     timing_results.push(BenchmarkResult::new(
@@ -156,7 +163,7 @@ fn test_markdown_format_s() {
         0.1023,              // min
         0.1080,              // max
         vec![0.1, 0.1, 0.1], // times
-        None,                // parameter
+        BTreeMap::new(),     // parameter
     ));
 
     let formatted = String::from_utf8(exporter.serialize(&timing_results, None).unwrap()).unwrap();
@@ -175,6 +182,7 @@ fn test_markdown_format_s() {
 /// The given time unit (s) is used to set the units for all entries.
 #[test]
 fn test_markdown_format_time_unit_s() {
+    use std::collections::BTreeMap;
     let exporter = MarkdownExporter::default();
 
     let mut timing_results = vec![];
@@ -189,7 +197,7 @@ fn test_markdown_format_time_unit_s() {
         0.1023,              // min
         0.1080,              // max
         vec![0.1, 0.1, 0.1], // times
-        None,                // parameter
+        BTreeMap::new(),     // parameter
     ));
 
     timing_results.push(BenchmarkResult::new(
@@ -202,7 +210,7 @@ fn test_markdown_format_time_unit_s() {
         2.0020,              // min
         2.0080,              // max
         vec![2.0, 2.0, 2.0], // times
-        None,                // parameter
+        BTreeMap::new(),     // parameter
     ));
 
     let formatted = String::from_utf8(
@@ -227,6 +235,7 @@ fn test_markdown_format_time_unit_s() {
 /// the units for all entries.
 #[test]
 fn test_markdown_format_time_unit_ms() {
+    use std::collections::BTreeMap;
     let exporter = MarkdownExporter::default();
 
     let mut timing_results = vec![];
@@ -241,7 +250,7 @@ fn test_markdown_format_time_unit_ms() {
         2.0020,              // min
         2.0080,              // max
         vec![2.0, 2.0, 2.0], // times
-        None,                // parameter
+        BTreeMap::new(),     // parameter
     ));
 
     timing_results.push(BenchmarkResult::new(
@@ -254,7 +263,7 @@ fn test_markdown_format_time_unit_ms() {
         0.1023,              // min
         0.1080,              // max
         vec![0.1, 0.1, 0.1], // times
-        None,                // parameter
+        BTreeMap::new(),     // parameter
     ));
 
     let formatted = String::from_utf8(

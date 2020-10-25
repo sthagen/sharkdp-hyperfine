@@ -3,9 +3,10 @@ use atty::Stream;
 use clap::{crate_version, App, AppSettings, Arg, ArgMatches};
 use std::ffi::OsString;
 
-pub fn get_arg_matches<T>(args: T) -> ArgMatches<'static>
+pub fn get_arg_matches<I, T>(args: I) -> ArgMatches<'static>
 where
-    T: Iterator<Item = OsString>,
+    I: IntoIterator<Item = T>,
+    T: Into<OsString> + Clone,
 {
     let app = build_app();
     app.get_matches_from(args)
@@ -134,6 +135,7 @@ fn build_app() -> App<'static, 'static> {
                 .long("parameter-list")
                 .short("L")
                 .takes_value(true)
+                .multiple(true)
                 .allow_hyphen_values(true)
                 .value_names(&["VAR", "VALUES"])
                 .conflicts_with_all(&["parameter-scan", "parameter-step-size"])
@@ -141,7 +143,9 @@ fn build_app() -> App<'static, 'static> {
                     "Perform benchmark runs for each value in the comma-separated list VALUES. \
                      Replaces the string '{VAR}' in each command by the current parameter value\
                      .\n\nExample:  hyperfine -L compiler gcc,clang '{compiler} -O2 main.cpp'\n\n\
-                     This performs benchmarks for 'gcc -O2 main.cpp' and 'clang -O2 main.cpp'.",
+                     This performs benchmarks for 'gcc -O2 main.cpp' and 'clang -O2 main.cpp'.\n\n\
+                     The option can be specified multiple times to run benchmarks for all \
+                     possible parameter combinations.\n"
                 ),
         )
         .arg(
@@ -223,6 +227,16 @@ fn build_app() -> App<'static, 'static> {
                      so it should only be used for debugging purposes or \
                      when trying to benchmark output speed.",
                 ),
+        )
+        .arg(
+            Arg::with_name("command-name")
+                .long("command-name")
+                .short("n")
+                .takes_value(true)
+                .multiple(true)
+                .number_of_values(1)
+                .value_name("NAME")
+                .help("Give a meaningful name to a command"),
         )
         .help_message("Print this help message.")
         .version_message("Show version information.")

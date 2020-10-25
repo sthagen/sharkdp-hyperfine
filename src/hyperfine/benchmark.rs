@@ -202,12 +202,20 @@ pub fn run_benchmark(
     shell_spawning_time: TimingResult,
     options: &HyperfineOptions,
 ) -> io::Result<BenchmarkResult> {
+    let shell_cmd = cmd.get_shell_command();
+    let command_name = if let Some(names) = &options.names {
+        names.get(num).unwrap_or(&shell_cmd)
+    } else {
+        &shell_cmd
+    };
+    let command_name = command_name.to_string();
+
     if options.output_style != OutputStyleOption::Disabled {
         println!(
             "{}{}: {}",
             "Benchmark #".bold(),
             (num + 1).to_string().bold(),
-            cmd
+            &command_name
         );
     }
 
@@ -223,12 +231,7 @@ pub fn run_benchmark(
         } else {
             &values[num]
         };
-        match cmd.get_parameter() {
-            Some((param, value)) => {
-                Command::new_parametrized(preparation_command, param, value.clone())
-            }
-            None => Command::new(preparation_command),
-        }
+        Command::new_parametrized(preparation_command, cmd.get_parameters().clone())
     });
 
     // Warmup phase
@@ -397,7 +400,7 @@ pub fn run_benchmark(
     let scores = modified_zscores(&times_real);
     if scores[0] > OUTLIER_THRESHOLD {
         warnings.push(Warnings::SlowInitialRun(times_real[0]));
-    } else if scores.iter().any(|&s| s > OUTLIER_THRESHOLD) {
+    } else if scores.iter().any(|&s| s.abs() > OUTLIER_THRESHOLD) {
         warnings.push(Warnings::OutliersDetected);
     }
 
@@ -414,20 +417,13 @@ pub fn run_benchmark(
     }
 
     // Run cleanup command
-    let cleanup_cmd =
-        options
-            .cleanup_command
-            .as_ref()
-            .map(|cleanup_command| match cmd.get_parameter() {
-                Some((param, value)) => {
-                    Command::new_parametrized(cleanup_command, param, value.clone())
-                }
-                None => Command::new(cleanup_command),
-            });
+    let cleanup_cmd = options.cleanup_command.as_ref().map(|cleanup_command| {
+        Command::new_parametrized(cleanup_command, cmd.get_parameters().clone())
+    });
     run_cleanup_command(&options.shell, &cleanup_cmd, options.show_output)?;
 
     Ok(BenchmarkResult::new(
-        cmd.get_shell_command(),
+        command_name,
         t_mean,
         t_stddev,
         t_median,
@@ -436,6 +432,9 @@ pub fn run_benchmark(
         t_min,
         t_max,
         times_real,
-        cmd.get_parameter().as_ref().map(|p| p.1.to_string()),
+        cmd.get_parameters()
+            .iter()
+            .map(|(name, value)| ((*name).to_string(), value.to_string()))
+            .collect(),
     ))
 }

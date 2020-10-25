@@ -12,7 +12,7 @@ use statistical::median;
 pub const OUTLIER_THRESHOLD: f64 = 1.4826 * 10.0;
 
 /// Compute modifized Z-scores for a given sample. A (unmodified) Z-score is defined by
-/// `(x_i - x_mean)/x_stddev` whereas the modified Z-score is defined by `|x_i - x_median|/MAD`
+/// `(x_i - x_mean)/x_stddev` whereas the modified Z-score is defined by `(x_i - x_median)/MAD`
 /// where MAD is the median average deviation.
 ///
 /// References:
@@ -28,6 +28,9 @@ pub fn modified_zscores(xs: &[f64]) -> Vec<f64> {
 
     // Compute median absolute deviation:
     let mad = median(&deviations);
+
+    // Handle MAD == 0 case
+    let mad = if mad > 0.0 { mad } else { f64::EPSILON };
 
     // Compute modified Z-scores (x_i - x_median) / MAD
     xs.iter().map(|&x| (x - x_median) / mad).collect()
@@ -97,5 +100,15 @@ fn test_detect_outliers() {
         20.0,
         -500.0,
     ];
+    assert_eq!(2, num_outliers(&xs));
+}
+
+#[test]
+fn test_detect_outliers_if_mad_becomes_0() {
+    // See https://stats.stackexchange.com/q/339932
+    let xs = [10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 100.0];
+    assert_eq!(1, num_outliers(&xs));
+
+    let xs = [10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 100.0, 100.0];
     assert_eq!(2, num_outliers(&xs));
 }

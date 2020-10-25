@@ -1,10 +1,57 @@
 # unreleased
 
 ## Features
+
 ## Changes
+
+- When `--export-*` commands are used, result files are created before benchmark execution
+  to fail early in case of, e.g., wrong permissions. See #306 (@s1ck). 
+- When `--export-*` options are used, result files are written after each individual 
+  benchmark command instead of writing after all benchmarks have finished. See #306 (@s1ck).
+
 ## Bugfixes
+
 ## Other
+
 ## Packaging
+
+
+
+# v1.11.0
+
+## Features
+
+- The `-L`/`--parameter-list` option can now be specified multiple times to
+  evaluate all possible combinations of the listed parameters:
+
+  ``` bash
+  hyperfine -L number 1,2 -L letter a,b,c \
+      "echo {number}{letter}" \
+      "printf '%s\n' {number}{letter}"
+  # runs 12 benchmarks: 2 commands (echo and printf) times 6 combinations of
+  # the "letter" and "number" parameters
+  ```
+
+  See: #253, #318 (@wchargin)
+
+- Add CLI option to identify a command with a custom name, see #326 (@scampi)
+
+## Changes
+
+- When parameters are used with `--parameter-list` or `--parameter-scan`, the JSON export format
+  now contains a dictionary `parameters` instead of a single key `parameter`. See #253, #318.
+- The `plot_parametrized.py` script now infers the parameter name, and its `--parameter-name`
+  argument has been deprecated. See #253, #318.
+
+## Bugfixes
+
+- Fix a bug in the outlier detection which would only detect "slow outliers" but not the fast
+  ones (runs that are much faster than the rest of the benchmarking runs), see #329
+- Better error messages for very fast commands that would lead to inf/nan results in the relative
+  speed comparison, see #319
+- Show error message if `--warmup` or `--*runs` arguments can not be parsed, see #337
+- Keep output colorized when the output is not interactive and `--style=full` or `--style=color` is used.
+
 
 # v1.10.0
 

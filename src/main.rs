@@ -1,4 +1,5 @@
 use std::cmp;
+use std::collections::BTreeMap;
 use std::env;
 use std::io;
 
@@ -15,7 +16,7 @@ use crate::hyperfine::export::{ExportManager, ExportType};
 use crate::hyperfine::internal::{tokenize, write_benchmark_comparison};
 use crate::hyperfine::parameter_range::get_parameterized_commands;
 use crate::hyperfine::types::{
-    BenchmarkResult, CmdFailureAction, Command, HyperfineOptions, OutputStyleOption, ParameterValue,
+    CmdFailureAction, Command, HyperfineOptions, OutputStyleOption, ParameterValue,
 };
 use crate::hyperfine::units::Unit;
 
@@ -26,7 +27,11 @@ pub fn error(message: &str) -> ! {
 }
 
 /// Runs the benchmark for the given commands
-fn run(commands: &[Command<'_>], options: &HyperfineOptions) -> io::Result<Vec<BenchmarkResult>> {
+fn run(
+    commands: &[Command<'_>],
+    options: &HyperfineOptions,
+    export_manager: &ExportManager,
+) -> io::Result<()> {
     let shell_spawning_time =
         mean_shell_spawning_time(&options.shell, options.output_style, options.show_output)?;
 
@@ -44,57 +49,65 @@ fn run(commands: &[Command<'_>], options: &HyperfineOptions) -> io::Result<Vec<B
     // Run the benchmarks
     for (num, cmd) in commands.iter().enumerate() {
         timing_results.push(run_benchmark(num, cmd, shell_spawning_time, options)?);
+
+        // Export (intermediate) results
+        let ans = export_manager.write_results(&timing_results, options.time_unit);
+        if let Err(e) = ans {
+            error(&format!(
+                "The following error occurred while exporting: {}",
+                e
+            ));
+        }
     }
 
-    Ok(timing_results)
+    // Print relative speed comparison
+    if options.output_style != OutputStyleOption::Disabled {
+        write_benchmark_comparison(&timing_results);
+    }
+
+    Ok(())
 }
 
 fn main() {
     let matches = get_arg_matches(env::args_os());
     let options = build_hyperfine_options(&matches);
-    let export_manager = build_export_manager(&matches);
     let commands = build_commands(&matches);
+    let export_manager = match build_export_manager(&matches) {
+        Ok(export_manager) => export_manager,
+        Err(ref e) => error(&e.to_string())
+    };
 
     let res = match options {
-        Ok(ref opts) => run(&commands, &opts),
+        Ok(ref opts) => run(&commands, &opts, &export_manager),
         Err(ref e) => error(&e.to_string()),
     };
 
     match res {
-        Ok(timing_results) => {
-            let options = options.unwrap();
-
-            if options.output_style != OutputStyleOption::Disabled {
-                write_benchmark_comparison(&timing_results);
-            }
-
-            let ans = export_manager.write_results(timing_results, options.time_unit);
-            if let Err(e) = ans {
-                error(&format!(
-                    "The following error occurred while exporting: {}",
-                    e
-                ));
-            }
-        }
+        Ok(_) => {}
         Err(e) => error(&e.to_string()),
     }
 }
 
 /// Build the HyperfineOptions that correspond to the given ArgMatches
-fn build_hyperfine_options(matches: &ArgMatches<'_>) -> Result<HyperfineOptions, OptionsError> {
+fn build_hyperfine_options<'a>(
+    matches: &ArgMatches<'a>,
+) -> Result<HyperfineOptions, OptionsError<'a>> {
     let mut options = HyperfineOptions::default();
     let param_to_u64 = |param| {
         matches
             .value_of(param)
-            .and_then(|n| u64::from_str_radix(n, 10).ok())
+            .map(|n| {
+                u64::from_str_radix(n, 10).map_err(|e| OptionsError::NumericParsingError(param, e))
+            })
+            .transpose()
     };
 
-    options.warmup_count = param_to_u64("warmup").unwrap_or(options.warmup_count);
+    options.warmup_count = param_to_u64("warmup")?.unwrap_or(options.warmup_count);
 
-    let mut min_runs = param_to_u64("min-runs");
-    let mut max_runs = param_to_u64("max-runs");
+    let mut min_runs = param_to_u64("min-runs")?;
+    let mut max_runs = param_to_u64("max-runs")?;
 
-    if let Some(runs) = param_to_u64("runs") {
+    if let Some(runs) = param_to_u64("runs")? {
         min_runs = Some(runs);
         max_runs = Some(runs);
     }
@@ -125,6 +138,16 @@ fn build_hyperfine_options(matches: &ArgMatches<'_>) -> Result<HyperfineOptions,
         }
         (None, None) => {}
     };
+
+    options.names = matches
+        .values_of("command-name")
+        .map(|values| values.map(String::from).collect::<Vec<String>>());
+    if let Some(ref names) = options.names {
+        let command_strings = matches.values_of("command").unwrap();
+        if names.len() > command_strings.len() {
+            return Err(OptionsError::TooManyCommandNames(command_strings.len()));
+        }
+    }
 
     options.preparation_command = matches
         .values_of("prepare")
@@ -158,7 +181,8 @@ fn build_hyperfine_options(matches: &ArgMatches<'_>) -> Result<HyperfineOptions,
         OutputStyleOption::Basic | OutputStyleOption::NoColor => {
             colored::control::set_override(false)
         }
-        _ => {}
+        OutputStyleOption::Full | OutputStyleOption::Color => colored::control::set_override(true),
+        OutputStyleOption::Disabled => {}
     };
 
     options.shell = matches
@@ -181,20 +205,21 @@ fn build_hyperfine_options(matches: &ArgMatches<'_>) -> Result<HyperfineOptions,
 
 /// Build the ExportManager that will export the results specified
 /// in the given ArgMatches
-fn build_export_manager(matches: &ArgMatches<'_>) -> ExportManager {
+fn build_export_manager(matches: &ArgMatches<'_>) -> io::Result<ExportManager> {
     let mut export_manager = ExportManager::new();
     {
-        let mut add_exporter = |flag, exporttype| {
+        let mut add_exporter = |flag, exporttype| -> io::Result<()> {
             if let Some(filename) = matches.value_of(flag) {
-                export_manager.add_exporter(exporttype, filename);
+                export_manager.add_exporter(exporttype, filename)?;
             }
+            Ok(())
         };
-        add_exporter("export-asciidoc", ExportType::Asciidoc);
-        add_exporter("export-json", ExportType::Json);
-        add_exporter("export-csv", ExportType::Csv);
-        add_exporter("export-markdown", ExportType::Markdown);
+        add_exporter("export-asciidoc", ExportType::Asciidoc)?;
+        add_exporter("export-json", ExportType::Json)?;
+        add_exporter("export-csv", ExportType::Csv)?;
+        add_exporter("export-markdown", ExportType::Markdown)?;
     }
-    export_manager
+    Ok(export_manager)
 }
 
 /// Build the commands to benchmark
@@ -207,27 +232,113 @@ fn build_commands<'a>(matches: &'a ArgMatches<'_>) -> Vec<Command<'a>> {
             Ok(commands) => commands,
             Err(e) => error(&e.to_string()),
         }
-    } else if let Some(mut args) = matches.values_of("parameter-list") {
-        let param_name = args.next().unwrap();
-        let param_list_str = args.next().unwrap();
-
-        let param_list = tokenize(param_list_str);
+    } else if let Some(args) = matches.values_of("parameter-list") {
+        let args: Vec<_> = args.collect();
+        let param_names_and_values: Vec<(&str, Vec<String>)> = args
+            .chunks_exact(2)
+            .map(|pair| {
+                let name = pair[0];
+                let list_str = pair[1];
+                (name, tokenize(list_str))
+            })
+            .collect();
+        {
+            let dupes = find_dupes(param_names_and_values.iter().map(|(name, _)| *name));
+            if !dupes.is_empty() {
+                error(&format!("duplicate parameter names: {}", &dupes.join(", ")))
+            }
+        }
         let command_list = command_strings.collect::<Vec<&str>>();
 
-        let mut commands = Vec::with_capacity(param_list.len() * command_list.len());
+        let dimensions: Vec<usize> = std::iter::once(command_list.len())
+            .chain(
+                param_names_and_values
+                    .iter()
+                    .map(|(_, values)| values.len()),
+            )
+            .collect();
+        let param_space_size = dimensions.iter().product();
+        if param_space_size == 0 {
+            return Vec::new();
+        }
 
-        for value in param_list {
-            for cmd in &command_list {
-                commands.push(Command::new_parametrized(
-                    cmd,
-                    param_name,
-                    ParameterValue::Text(value.clone()),
-                ));
+        let mut commands = Vec::with_capacity(param_space_size);
+        let mut index = vec![0usize; dimensions.len()];
+        'outer: loop {
+            let (command_index, params_indices) = index.split_first().unwrap();
+            let parameters = param_names_and_values
+                .iter()
+                .zip(params_indices)
+                .map(|((name, values), i)| (*name, ParameterValue::Text(values[*i].clone())))
+                .collect();
+            commands.push(Command::new_parametrized(
+                command_list[*command_index],
+                parameters,
+            ));
+
+            // Increment index, exiting loop on overflow.
+            for (i, n) in index.iter_mut().zip(dimensions.iter()) {
+                *i += 1;
+                if *i < *n {
+                    continue 'outer;
+                } else {
+                    *i = 0;
+                }
             }
+            break 'outer;
         }
 
         commands
     } else {
         command_strings.map(Command::new).collect()
     }
+}
+
+/// Finds all the strings that appear multiple times in the input iterator, returning them in
+/// sorted order. If no string appears more than once, the result is an empty vector.
+fn find_dupes<'a, I: IntoIterator<Item = &'a str>>(i: I) -> Vec<&'a str> {
+    let mut counts = BTreeMap::<&'a str, usize>::new();
+    for s in i {
+        *counts.entry(s).or_default() += 1;
+    }
+    counts
+        .into_iter()
+        .filter_map(|(k, n)| if n > 1 { Some(k) } else { None })
+        .collect()
+}
+
+#[test]
+fn test_build_commands_cross_product() {
+    let matches = get_arg_matches(vec![
+        "hyperfine",
+        "-L",
+        "foo",
+        "a,b",
+        "-L",
+        "bar",
+        "z,y",
+        "echo {foo} {bar}",
+        "printf '%s\n' {foo} {bar}",
+    ]);
+    let result = build_commands(&matches);
+
+    // Iteration order: command list first, then parameters in listed order (here, "foo" before
+    // "bar", which is distinct from their sorted order), with parameter values in listed order.
+    let pv = |s: &str| ParameterValue::Text(s.to_string());
+    let cmd = |cmd: usize, foo: &str, bar: &str| {
+        let expression = ["echo {foo} {bar}", "printf '%s\n' {foo} {bar}"][cmd];
+        let params = vec![("foo", pv(foo)), ("bar", pv(bar))];
+        Command::new_parametrized(expression, params)
+    };
+    let expected = vec![
+        cmd(0, "a", "z"),
+        cmd(1, "a", "z"),
+        cmd(0, "b", "z"),
+        cmd(1, "b", "z"),
+        cmd(0, "a", "y"),
+        cmd(1, "a", "y"),
+        cmd(0, "b", "y"),
+        cmd(1, "b", "y"),
+    ];
+    assert_eq!(result, expected);
 }

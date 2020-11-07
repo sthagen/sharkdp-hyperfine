@@ -77,6 +77,26 @@ hyperfine --parameter-scan delay 0.3 0.7 -D 0.2 'sleep {delay}'
 ```
 This runs `sleep 0.3`, `sleep 0.5` and `sleep 0.7`.
 
+### Shell functions and aliases
+
+If you are using bash, you can export shell functions to directly benchmark them with hyperfine:
+
+```
+$ my_function() { sleep 1; }
+$ export -f my_function
+$ hyperfine my_function
+```
+
+If you are using a different shell, or if you want to benchmark shell aliases, you may try to put
+them in a separate file:
+
+```bash
+echo 'my_function() { sleep 1 }' > /tmp/my_function.sh
+echo 'alias my_alias="sleep 1"' > /tmp/my_alias.sh
+hyperfine 'source /tmp/my_function.sh; eval my_function'
+hyperfine 'source /tmp/my_alias.sh; eval my_alias'
+```
+
 ### Export results
 
 Hyperfine has multiple options for exporting benchmark results: CSV, JSON, Markdown (see `--help`

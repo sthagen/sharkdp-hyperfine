@@ -18,6 +18,10 @@ parser.add_argument("--title", help="Plot Title")
 parser.add_argument(
     "--labels", help="Comma-separated list of entries for the plot legend"
 )
+parser.add_argument(
+    "-o", "--output", help="Save image to the given filename."
+)
+
 args = parser.parse_args()
 
 with open(args.file) as f:
@@ -41,4 +45,7 @@ if args.title:
 plt.legend(handles=boxplot["boxes"], labels=labels, loc="best", fontsize="medium")
 plt.ylabel("Time [s]")
 plt.ylim(0, None)
-plt.show()
+if args.output:
+    plt.savefig(args.output)
+else:
+    plt.show()

@@ -31,7 +31,7 @@ pub fn get_progress_bar(length: u64, msg: &str, option: OutputStyleOption) -> Pr
     };
     progress_bar.set_style(progressbar_style.clone());
     progress_bar.enable_steady_tick(TICK_SETTINGS.1);
-    progress_bar.set_message(msg);
+    progress_bar.set_message(msg.to_owned());
 
     progress_bar
 }
@@ -157,6 +157,7 @@ fn create_result(name: &str, mean: Scalar) -> BenchmarkResult {
         min: mean,
         max: mean,
         times: None,
+        exit_codes: Vec::new(),
         parameters: BTreeMap::new(),
     }
 }

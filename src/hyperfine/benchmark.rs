@@ -1,6 +1,6 @@
 use std::cmp;
 use std::io;
-use std::process::Stdio;
+use std::process::{ExitStatus, Stdio};
 
 use colored::*;
 use statistical::{mean, median, standard_deviation};
@@ -46,7 +46,7 @@ pub fn time_shell_command(
     show_output: bool,
     failure_action: CmdFailureAction,
     shell_spawning_time: Option<TimingResult>,
-) -> io::Result<(TimingResult, bool)> {
+) -> io::Result<(TimingResult, ExitStatus)> {
     let (stdout, stderr) = if show_output {
         (Stdio::inherit(), Stdio::inherit())
     } else {
@@ -88,7 +88,7 @@ pub fn time_shell_command(
             time_user,
             time_system,
         },
-        result.status.success(),
+        result.status,
     ))
 }
 
@@ -201,6 +201,27 @@ fn run_cleanup_command(
     run_intermediate_command(shell, command, show_output, error_output)
 }
 
+#[cfg(unix)]
+fn extract_exit_code(status: ExitStatus) -> Option<i32> {
+    use std::os::unix::process::ExitStatusExt;
+
+    /* From the ExitStatus::code documentation:
+       "On Unix, this will return None if the process was terminated by a signal."
+       In that case, ExitStatusExt::signal should never return None.
+    */
+    status.code().or_else(||
+        /* To differentiate between "normal" exit codes and signals, we are using
+           something similar to bash exit codes (https://tldp.org/LDP/abs/html/exitcodes.html)
+           by adding 128 to a signal integer value.
+         */
+        status.signal().map(|s| 128 + s))
+}
+
+#[cfg(not(unix))]
+fn extract_exit_code(status: ExitStatus) -> Option<i32> {
+    status.code()
+}
+
 /// Run the benchmark for a single shell command
 pub fn run_benchmark(
     num: usize,
@@ -219,7 +240,7 @@ pub fn run_benchmark(
     if options.output_style != OutputStyleOption::Disabled {
         println!(
             "{}{}: {}",
-            "Benchmark #".bold(),
+            "Benchmark ".bold(),
             (num + 1).to_string().bold(),
             &command_name
         );
@@ -228,6 +249,7 @@ pub fn run_benchmark(
     let mut times_real: Vec<Second> = vec![];
     let mut times_user: Vec<Second> = vec![];
     let mut times_system: Vec<Second> = vec![];
+    let mut exit_codes: Vec<Option<i32>> = vec![];
     let mut all_succeeded = true;
 
     // Run init command
@@ -280,13 +302,14 @@ pub fn run_benchmark(
     let prepare_res = run_preparation_command(&options.shell, &prepare_cmd, options.show_output)?;
 
     // Initial timing run
-    let (res, success) = time_shell_command(
+    let (res, status) = time_shell_command(
         &options.shell,
         cmd,
         options.show_output,
         options.failure_action,
         Some(shell_spawning_time),
     )?;
+    let success = status.success();
 
     // Determine number of benchmark runs
     let runs_in_min_time = (options.min_time_sec
@@ -310,6 +333,7 @@ pub fn run_benchmark(
     times_real.push(res.time_real);
     times_user.push(res.time_user);
     times_system.push(res.time_system);
+    exit_codes.push(extract_exit_code(status));
 
     all_succeeded = all_succeeded && success;
 
@@ -326,19 +350,21 @@ pub fn run_benchmark(
             format!("Current estimate: {}", mean.to_string().green())
         };
 
-        progress_bar.as_ref().map(|bar| bar.set_message(&msg));
+        progress_bar.as_ref().map(|bar| bar.set_message(msg.to_owned()));
 
-        let (res, success) = time_shell_command(
+        let (res, status) = time_shell_command(
             &options.shell,
             cmd,
             options.show_output,
             options.failure_action,
             Some(shell_spawning_time),
         )?;
+        let success = status.success();
 
         times_real.push(res.time_real);
         times_user.push(res.time_user);
         times_system.push(res.time_system);
+        exit_codes.push(extract_exit_code(status));
 
         all_succeeded = all_succeeded && success;
 
@@ -438,6 +464,7 @@ pub fn run_benchmark(
         t_min,
         t_max,
         times_real,
+        exit_codes,
         cmd.get_parameters()
             .iter()
             .map(|(name, value)| ((*name).to_string(), value.to_string()))

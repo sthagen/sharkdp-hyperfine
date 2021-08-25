@@ -5,17 +5,21 @@ use std::process::{ExitStatus, Stdio};
 use colored::*;
 use statistical::{mean, median, standard_deviation};
 
-use crate::hyperfine::format::{format_duration, format_duration_unit};
-use crate::hyperfine::internal::{get_progress_bar, max, min, MIN_EXECUTION_TIME};
-use crate::hyperfine::outlier_detection::{modified_zscores, OUTLIER_THRESHOLD};
-use crate::hyperfine::shell::execute_and_time;
-use crate::hyperfine::timer::wallclocktimer::WallClockTimer;
-use crate::hyperfine::timer::{TimerStart, TimerStop};
-use crate::hyperfine::types::{
-    BenchmarkResult, CmdFailureAction, Command, HyperfineOptions, OutputStyleOption,
-};
-use crate::hyperfine::units::Second;
-use crate::hyperfine::warnings::Warnings;
+use crate::benchmark_result::BenchmarkResult;
+use crate::command::Command;
+use crate::format::{format_duration, format_duration_unit};
+use crate::min_max::{max, min};
+use crate::options::{CmdFailureAction, HyperfineOptions, OutputStyleOption};
+use crate::outlier_detection::{modified_zscores, OUTLIER_THRESHOLD};
+use crate::progress_bar::get_progress_bar;
+use crate::shell::execute_and_time;
+use crate::timer::wallclocktimer::WallClockTimer;
+use crate::timer::{TimerStart, TimerStop};
+use crate::units::Second;
+use crate::warnings::Warnings;
+
+/// Threshold for warning about fast execution time
+pub const MIN_EXECUTION_TIME: Second = 5e-3;
 
 /// Results from timing a single shell command
 #[derive(Debug, Default, Copy, Clone)]
@@ -147,10 +151,14 @@ pub fn mean_shell_spawning_time(
             }
         }
 
-        progress_bar.as_ref().map(|bar| bar.inc(1));
+        if let Some(bar) = progress_bar.as_ref() {
+            bar.inc(1)
+        }
     }
 
-    progress_bar.as_ref().map(|bar| bar.finish_and_clear());
+    if let Some(bar) = progress_bar.as_ref() {
+        bar.finish_and_clear()
+    }
 
     Ok(TimingResult {
         time_real: mean(&times_real),
@@ -276,9 +284,13 @@ pub fn run_benchmark(
                 options.failure_action,
                 None,
             )?;
-            progress_bar.as_ref().map(|bar| bar.inc(1));
+            if let Some(bar) = progress_bar.as_ref() {
+                bar.inc(1)
+            }
         }
-        progress_bar.as_ref().map(|bar| bar.finish_and_clear());
+        if let Some(bar) = progress_bar.as_ref() {
+            bar.finish_and_clear()
+        }
     }
 
     // Set up progress bar (and spinner for initial measurement)
@@ -331,8 +343,12 @@ pub fn run_benchmark(
     all_succeeded = all_succeeded && success;
 
     // Re-configure the progress bar
-    progress_bar.as_ref().map(|bar| bar.set_length(count));
-    progress_bar.as_ref().map(|bar| bar.inc(1));
+    if let Some(bar) = progress_bar.as_ref() {
+        bar.set_length(count)
+    }
+    if let Some(bar) = progress_bar.as_ref() {
+        bar.inc(1)
+    }
 
     // Gather statistics
     for _ in 0..count_remaining {
@@ -343,7 +359,9 @@ pub fn run_benchmark(
             format!("Current estimate: {}", mean.to_string().green())
         };
 
-        progress_bar.as_ref().map(|bar| bar.set_message(msg.to_owned()));
+        if let Some(bar) = progress_bar.as_ref() {
+            bar.set_message(msg.to_owned())
+        }
 
         let (res, status) = time_shell_command(
             &options.shell,
@@ -361,10 +379,14 @@ pub fn run_benchmark(
 
         all_succeeded = all_succeeded && success;
 
-        progress_bar.as_ref().map(|bar| bar.inc(1));
+        if let Some(bar) = progress_bar.as_ref() {
+            bar.inc(1)
+        }
     }
 
-    progress_bar.as_ref().map(|bar| bar.finish_and_clear());
+    if let Some(bar) = progress_bar.as_ref() {
+        bar.finish_and_clear()
+    }
 
     // Compute statistical quantities
     let t_num = times_real.len();

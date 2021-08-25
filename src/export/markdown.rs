@@ -1,11 +1,10 @@
-use super::Exporter;
-
-use crate::hyperfine::format::format_duration_value;
-use crate::hyperfine::internal::{compute_relative_speed, BenchmarkResultWithRelativeSpeed};
-use crate::hyperfine::types::BenchmarkResult;
-use crate::hyperfine::units::Unit;
-
 use std::io::{Error, ErrorKind, Result};
+
+use super::Exporter;
+use crate::benchmark_result::BenchmarkResult;
+use crate::format::format_duration_value;
+use crate::relative_speed::{self, BenchmarkResultWithRelativeSpeed};
+use crate::units::Unit;
 
 #[derive(Default)]
 pub struct MarkdownExporter {}
@@ -23,7 +22,7 @@ impl Exporter for MarkdownExporter {
             Unit::Second
         };
 
-        if let Some(annotated_results) = compute_relative_speed(results) {
+        if let Some(annotated_results) = relative_speed::compute(results) {
             let mut destination = start_table(unit);
 
             for result in annotated_results {

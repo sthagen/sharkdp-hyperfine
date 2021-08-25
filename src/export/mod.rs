@@ -1,3 +1,6 @@
+use std::fs::{File, OpenOptions};
+use std::io::{Result, Write};
+
 mod asciidoc;
 mod csv;
 mod json;
@@ -8,11 +11,8 @@ use self::csv::CsvExporter;
 use self::json::JsonExporter;
 use self::markdown::MarkdownExporter;
 
-use std::fs::{File, OpenOptions};
-use std::io::{Result, Write};
-
-use crate::hyperfine::types::BenchmarkResult;
-use crate::hyperfine::units::Unit;
+use crate::benchmark_result::BenchmarkResult;
+use crate::units::Unit;
 
 /// The desired form of exporter to use for a given file.
 #[derive(Clone)]
@@ -75,7 +75,7 @@ impl ExportManager {
     /// Write the given results to all Exporters contained within this manager
     pub fn write_results(&self, results: &[BenchmarkResult], unit: Option<Unit>) -> Result<()> {
         for e in &self.exporters {
-            let file_content = e.exporter.serialize(&results, unit)?;
+            let file_content = e.exporter.serialize(results, unit)?;
             write_to_file(&e.filename, &file_content)?;
         }
         Ok(())

@@ -1,12 +1,11 @@
-use super::Exporter;
-
-use crate::hyperfine::types::BenchmarkResult;
-use crate::hyperfine::units::Unit;
-
 use std::borrow::Cow;
 use std::io::{Error, ErrorKind, Result};
 
 use csv::WriterBuilder;
+
+use super::Exporter;
+use crate::benchmark_result::BenchmarkResult;
+use crate::units::Unit;
 
 #[derive(Default)]
 pub struct CsvExporter {}
@@ -32,8 +31,7 @@ impl Exporter for CsvExporter {
         }
 
         for res in results {
-            let mut fields = Vec::new();
-            fields.push(Cow::Borrowed(res.command.as_bytes()));
+            let mut fields = vec![Cow::Borrowed(res.command.as_bytes())];
             for f in &[
                 res.mean, res.stddev, res.median, res.user, res.system, res.min, res.max,
             ] {

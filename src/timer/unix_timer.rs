@@ -1,11 +1,10 @@
 #![cfg(not(windows))]
 
-use super::internal::{CPUInterval, CPUTimes};
-use crate::hyperfine::timer::{TimerStart, TimerStop};
-use crate::hyperfine::units::Second;
-
 use std::mem;
 use std::process::Child;
+
+use crate::timer::{CPUInterval, CPUTimes, TimerStart, TimerStop};
+use crate::units::Second;
 
 pub fn get_cpu_timer() -> Box<dyn TimerStop<Result = (Second, Second)>> {
     Box::new(CPUTimer::start())
@@ -50,6 +49,7 @@ fn get_cpu_times() -> CPUTimes {
 
     const MICROSEC_PER_SEC: i64 = 1000 * 1000;
 
+    #[allow(clippy::useless_conversion)]
     CPUTimes {
         user_usec: i64::from(result.ru_utime.tv_sec) * MICROSEC_PER_SEC
             + i64::from(result.ru_utime.tv_usec),

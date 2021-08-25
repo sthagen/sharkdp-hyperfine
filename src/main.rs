@@ -7,23 +7,76 @@ use atty::Stream;
 use clap::ArgMatches;
 use colored::*;
 
-mod hyperfine;
+pub mod app;
+pub mod benchmark;
+pub mod benchmark_result;
+pub mod command;
+pub mod error;
+pub mod export;
+pub mod format;
+pub mod min_max;
+pub mod options;
+pub mod outlier_detection;
+pub mod parameter_range;
+pub mod progress_bar;
+pub mod relative_speed;
+pub mod shell;
+pub mod timer;
+pub mod tokenize;
+pub mod types;
+pub mod units;
+pub mod warnings;
 
-use crate::hyperfine::app::get_arg_matches;
-use crate::hyperfine::benchmark::{mean_shell_spawning_time, run_benchmark};
-use crate::hyperfine::error::OptionsError;
-use crate::hyperfine::export::{ExportManager, ExportType};
-use crate::hyperfine::internal::{tokenize, write_benchmark_comparison};
-use crate::hyperfine::parameter_range::get_parameterized_commands;
-use crate::hyperfine::types::{
-    CmdFailureAction, Command, HyperfineOptions, OutputStyleOption, ParameterValue,
-};
-use crate::hyperfine::units::Unit;
+use app::get_arg_matches;
+use benchmark::{mean_shell_spawning_time, run_benchmark};
+use benchmark_result::BenchmarkResult;
+use command::Command;
+use error::OptionsError;
+use export::{ExportManager, ExportType};
+use options::{CmdFailureAction, HyperfineOptions, OutputStyleOption};
+use parameter_range::get_parameterized_commands;
+use tokenize::tokenize;
+use types::ParameterValue;
+use units::Unit;
 
 /// Print error message to stderr and terminate
 pub fn error(message: &str) -> ! {
     eprintln!("{} {}", "Error:".red(), message);
     std::process::exit(1);
+}
+
+pub fn write_benchmark_comparison(results: &[BenchmarkResult]) {
+    if results.len() < 2 {
+        return;
+    }
+
+    if let Some(mut annotated_results) = relative_speed::compute(results) {
+        annotated_results.sort_by(|l, r| relative_speed::compare_mean_time(l.result, r.result));
+
+        let fastest = &annotated_results[0];
+        let others = &annotated_results[1..];
+
+        println!("{}", "Summary".bold());
+        println!("  '{}' ran", fastest.result.command.cyan());
+
+        for item in others {
+            println!(
+                "{} ± {} times faster than '{}'",
+                format!("{:8.2}", item.relative_speed).bold().green(),
+                format!("{:.2}", item.relative_speed_stddev).green(),
+                &item.result.command.magenta()
+            );
+        }
+    } else {
+        eprintln!(
+            "{}: The benchmark comparison could not be computed as some benchmark times are zero. \
+             This could be caused by background interference during the initial calibration phase \
+             of hyperfine, in combination with very fast commands (faster than a few milliseconds). \
+             Try to re-run the benchmark on a quiet system. If it does not help, you command is \
+             most likely too fast to be accurately benchmarked by hyperfine.",
+             "Note".bold().red()
+        );
+    }
 }
 
 /// Runs the benchmark for the given commands
@@ -78,7 +131,7 @@ fn main() {
     };
 
     let res = match options {
-        Ok(ref opts) => run(&commands, &opts, &export_manager),
+        Ok(ref opts) => run(&commands, opts, &export_manager),
         Err(ref e) => error(&e.to_string()),
     };
 
@@ -97,7 +150,8 @@ fn build_hyperfine_options<'a>(
         matches
             .value_of(param)
             .map(|n| {
-                u64::from_str_radix(n, 10).map_err(|e| OptionsError::NumericParsingError(param, e))
+                n.parse::<u64>()
+                    .map_err(|e| OptionsError::NumericParsingError(param, e))
             })
             .transpose()
     };
@@ -271,7 +325,7 @@ fn build_commands<'a>(matches: &'a ArgMatches<'_>) -> Vec<Command<'a>> {
             let name = command_names
                 .get(i)
                 .or_else(|| command_names.get(0))
-                .map(|s| *s);
+                .copied();
             i += 1;
 
             let (command_index, params_indices) = index.split_first().unwrap();
@@ -309,7 +363,7 @@ fn build_commands<'a>(matches: &'a ArgMatches<'_>) -> Vec<Command<'a>> {
         let command_list = command_strings.collect::<Vec<&str>>();
         let mut commands = Vec::with_capacity(command_list.len());
         for (i, s) in command_list.iter().enumerate() {
-            commands.push(Command::new(command_names.get(i).copied(), &s));
+            commands.push(Command::new(command_names.get(i).copied(), s));
         }
         commands
     }

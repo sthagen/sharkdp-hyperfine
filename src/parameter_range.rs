@@ -1,10 +1,13 @@
-use crate::hyperfine::error::ParameterScanError;
-use crate::hyperfine::types::{Command, NumericType, ParameterValue};
-use clap::Values;
-use rust_decimal::Decimal;
 use std::convert::TryInto;
 use std::ops::{Add, AddAssign, Div, Sub};
 use std::str::FromStr;
+
+use clap::Values;
+use rust_decimal::Decimal;
+
+use crate::command::Command;
+use crate::error::ParameterScanError;
+use crate::types::{NumericType, ParameterValue};
 
 trait Numeric:
     Add<Output = Self>
@@ -119,7 +122,7 @@ fn build_parameterized_commands<'a, T: Numeric>(
             let name = command_names
                 .get(i)
                 .or_else(|| command_names.get(0))
-                .map(|s| *s);
+                .copied();
             commands.push(Command::new_parametrized(
                 name,
                 cmd,

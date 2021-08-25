@@ -1,10 +1,9 @@
-use super::Exporter;
-
-use crate::hyperfine::format::format_duration_value;
-use crate::hyperfine::types::BenchmarkResult;
-use crate::hyperfine::units::Unit;
-
 use std::io::Result;
+
+use super::Exporter;
+use crate::benchmark_result::BenchmarkResult;
+use crate::format::format_duration_value;
+use crate::units::Unit;
 
 #[derive(Default)]
 pub struct AsciidocExporter {}

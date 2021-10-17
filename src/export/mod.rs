@@ -42,18 +42,12 @@ struct ExporterWithFilename {
 }
 
 /// Handles the management of multiple file exporters.
+#[derive(Default)]
 pub struct ExportManager {
     exporters: Vec<ExporterWithFilename>,
 }
 
 impl ExportManager {
-    /// Create a new ExportManager
-    pub fn new() -> ExportManager {
-        ExportManager {
-            exporters: Vec::new(),
-        }
-    }
-
     /// Add an additional exporter to the ExportManager
     pub fn add_exporter(&mut self, export_type: ExportType, filename: &str) -> Result<()> {
         let _ = File::create(filename)?;

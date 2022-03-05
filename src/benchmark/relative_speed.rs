@@ -1,12 +1,13 @@
 use std::cmp::Ordering;
 
-use crate::{benchmark_result::BenchmarkResult, units::Scalar};
+use super::benchmark_result::BenchmarkResult;
+use crate::util::units::Scalar;
 
 #[derive(Debug)]
 pub struct BenchmarkResultWithRelativeSpeed<'a> {
     pub result: &'a BenchmarkResult,
     pub relative_speed: Scalar,
-    pub relative_speed_stddev: Scalar,
+    pub relative_speed_stddev: Option<Scalar>,
     pub is_fastest: bool,
 }
 
@@ -32,10 +33,15 @@ pub fn compute(results: &[BenchmarkResult]) -> Option<Vec<BenchmarkResultWithRel
 
                 // https://en.wikipedia.org/wiki/Propagation_of_uncertainty#Example_formulas
                 // Covariance asssumed to be 0, i.e. variables are assumed to be independent
-                let ratio_stddev = ratio
-                    * ((result.stddev / result.mean).powi(2)
-                        + (fastest.stddev / fastest.mean).powi(2))
-                    .sqrt();
+                let ratio_stddev = match (result.stddev, fastest.stddev) {
+                    (Some(result_stddev), Some(fastest_stddev)) => Some(
+                        ratio
+                            * ((result_stddev / result.mean).powi(2)
+                                + (fastest_stddev / fastest.mean).powi(2))
+                            .sqrt(),
+                    ),
+                    _ => None,
+                };
 
                 BenchmarkResultWithRelativeSpeed {
                     result,
@@ -55,7 +61,7 @@ fn create_result(name: &str, mean: Scalar) -> BenchmarkResult {
     BenchmarkResult {
         command: name.into(),
         mean,
-        stddev: 1.0,
+        stddev: Some(1.0),
         median: mean,
         user: mean,
         system: 0.0,

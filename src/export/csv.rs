@@ -1,11 +1,12 @@
 use std::borrow::Cow;
-use std::io::{Error, ErrorKind, Result};
 
 use csv::WriterBuilder;
 
 use super::Exporter;
-use crate::benchmark_result::BenchmarkResult;
-use crate::units::Unit;
+use crate::benchmark::benchmark_result::BenchmarkResult;
+use crate::util::units::Unit;
+
+use anyhow::Result;
 
 #[derive(Default)]
 pub struct CsvExporter {}
@@ -33,7 +34,13 @@ impl Exporter for CsvExporter {
         for res in results {
             let mut fields = vec![Cow::Borrowed(res.command.as_bytes())];
             for f in &[
-                res.mean, res.stddev, res.median, res.user, res.system, res.min, res.max,
+                res.mean,
+                res.stddev.unwrap_or(0.0),
+                res.median,
+                res.user,
+                res.system,
+                res.min,
+                res.max,
             ] {
                 fields.push(Cow::Owned(f.to_string().into_bytes()))
             }
@@ -43,9 +50,7 @@ impl Exporter for CsvExporter {
             writer.write_record(fields)?;
         }
 
-        writer
-            .into_inner()
-            .map_err(|e| Error::new(ErrorKind::Other, e))
+        Ok(writer.into_inner()?)
     }
 }
 
@@ -54,44 +59,43 @@ fn test_csv() {
     use std::collections::BTreeMap;
     let exporter = CsvExporter::default();
 
-    // NOTE: results are fabricated
     let results = vec![
-        BenchmarkResult::new(
-            String::from("FOO=one BAR=two command | 1"),
-            1.0,
-            2.0,
-            1.0,
-            3.0,
-            4.0,
-            5.0,
-            6.0,
-            vec![7.0, 8.0, 9.0],
-            vec![Some(0), Some(0), Some(0)],
-            {
+        BenchmarkResult {
+            command: String::from("FOO=one BAR=two command | 1"),
+            mean: 1.0,
+            stddev: Some(2.0),
+            median: 1.0,
+            user: 3.0,
+            system: 4.0,
+            min: 5.0,
+            max: 6.0,
+            times: Some(vec![7.0, 8.0, 9.0]),
+            exit_codes: vec![Some(0), Some(0), Some(0)],
+            parameters: {
                 let mut params = BTreeMap::new();
                 params.insert("foo".into(), "one".into());
                 params.insert("bar".into(), "two".into());
                 params
             },
-        ),
-        BenchmarkResult::new(
-            String::from("FOO=one BAR=seven command | 2"),
-            11.0,
-            12.0,
-            11.0,
-            13.0,
-            14.0,
-            15.0,
-            16.5,
-            vec![17.0, 18.0, 19.0],
-            vec![Some(0), Some(0), Some(0)],
-            {
+        },
+        BenchmarkResult {
+            command: String::from("FOO=one BAR=seven command | 2"),
+            mean: 11.0,
+            stddev: Some(12.0),
+            median: 11.0,
+            user: 13.0,
+            system: 14.0,
+            min: 15.0,
+            max: 16.5,
+            times: Some(vec![17.0, 18.0, 19.0]),
+            exit_codes: vec![Some(0), Some(0), Some(0)],
+            parameters: {
                 let mut params = BTreeMap::new();
                 params.insert("foo".into(), "one".into());
                 params.insert("bar".into(), "seven".into());
                 params
             },
-        ),
+        },
     ];
     let exps: String = String::from(
         "command,mean,stddev,median,user,system,min,max,parameter_bar,parameter_foo\n\

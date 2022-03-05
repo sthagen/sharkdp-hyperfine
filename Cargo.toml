@@ -7,7 +7,7 @@ license = "MIT/Apache-2.0"
 name = "hyperfine"
 readme = "README.md"
 repository = "https://github.com/sharkdp/hyperfine"
-version = "1.12.0"
+version = "1.13.0"
 edition = "2018"
 build = "build.rs"
 
@@ -19,9 +19,11 @@ atty = "0.2"
 csv = "1.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-rust_decimal = "1.16"
+rust_decimal = "1.19"
 rand = "0.8"
 shell-words = "1.0"
+thiserror = "1.0"
+anyhow = "1.0"
 
 [target.'cfg(not(windows))'.dependencies]
 libc = "0.2"
@@ -30,19 +32,20 @@ libc = "0.2"
 winapi = { version = "0.3", features = ["processthreadsapi", "minwindef", "winnt"] }
 
 [dependencies.clap]
-version = "2"
+version = "3"
 default-features = false
-features = ["suggestions", "color", "wrap_help"]
+features = ["suggestions", "color", "wrap_help", "cargo"]
 
 [dev-dependencies]
 approx = "0.5"
 assert_cmd = "2.0"
-predicates = "2.0"
-tempfile = "3.2"
+predicates = "2.1"
+tempfile = "3.3"
 
 [build-dependencies]
-clap = "2"
+clap = "3"
 atty = "0.2"
+clap_complete = "3"
 
 [profile.release]
 lto = true

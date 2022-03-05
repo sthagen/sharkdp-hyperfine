@@ -1,35 +1,31 @@
 #![cfg(not(windows))]
 
 use std::mem;
-use std::process::Child;
 
-use crate::timer::{CPUInterval, CPUTimes, TimerStart, TimerStop};
-use crate::units::Second;
+use crate::timer::CPUTimes;
+use crate::util::units::Second;
 
-pub fn get_cpu_timer() -> Box<dyn TimerStop<Result = (Second, Second)>> {
-    Box::new(CPUTimer::start())
+#[derive(Debug, Copy, Clone)]
+pub struct CPUInterval {
+    /// Total amount of time spent executing in user mode
+    pub user: Second,
+
+    /// Total amount of time spent executing in kernel mode
+    pub system: Second,
 }
 
-struct CPUTimer {
+pub struct CPUTimer {
     start_cpu: CPUTimes,
 }
 
-impl TimerStart for CPUTimer {
-    fn start() -> Self {
+impl CPUTimer {
+    pub fn start() -> Self {
         CPUTimer {
             start_cpu: get_cpu_times(),
         }
     }
 
-    fn start_for_process(_: &Child) -> Self {
-        Self::start()
-    }
-}
-
-impl TimerStop for CPUTimer {
-    type Result = (Second, Second);
-
-    fn stop(&self) -> Self::Result {
+    pub fn stop(&self) -> (Second, Second) {
         let end_cpu = get_cpu_times();
         let cpu_interval = cpu_time_interval(&self.start_cpu, &end_cpu);
         (cpu_interval.user, cpu_interval.system)

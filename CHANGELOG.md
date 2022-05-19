@@ -15,6 +15,15 @@
 ## Packaging
 
 
+# v1.14.0
+
+## Features
+
+- Add a new `--output={null,pipe,inherit,<FILE>}` option to control
+  where the output of the benchmarked program is redirected (if at all),
+  see #377 and #509 (@tavianator, originally suggested by @BurntSushi)
+- Add Emacs org-mode as a new export format, see #491 (@ppaulweber)
+
 
 # v1.13.0
 

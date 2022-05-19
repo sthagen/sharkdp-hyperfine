@@ -242,6 +242,13 @@ fn build_command() -> Command<'static> {
                 .help("Export the timing summary statistics as a Markdown table to the given FILE."),
         )
         .arg(
+            Arg::new("export-orgmode")
+                .long("export-orgmode")
+                .takes_value(true)
+                .value_name("FILE")
+                .help("Export the timing summary statistics as a Emacs org-mode table to the given FILE."),
+        )
+        .arg(
             Arg::new("show-output")
                 .long("show-output")
                 .conflicts_with("style")
@@ -250,6 +257,23 @@ fn build_command() -> Command<'static> {
                      This will increase the time it takes for benchmarks to run, \
                      so it should only be used for debugging purposes or \
                      when trying to benchmark output speed.",
+                ),
+        )
+        .arg(
+            Arg::new("output")
+                .long("output")
+                .conflicts_with("show-output")
+                .takes_value(true)
+                .value_name("WHERE")
+                .help(
+                    "Control where the output of the benchmark is redirected. <WHERE> can be:\n\n\
+                     null: Redirect output to /dev/null (the default). \
+                     Note that some programs like 'grep' detect when standard output is /dev/null \
+                     and apply certain optimizations. To avoid that, consider using \
+                     '--output=pipe'.\n\n\
+                     pipe: Feed the output through a pipe before discarding it.\n\n\
+                     inherit: Don't redirect the output at all (same as '--show-output').\n\n\
+                     <FILE>: Write the output to the given file.",
                 ),
         )
         .arg(

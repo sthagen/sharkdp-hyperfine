@@ -1,5 +1,7 @@
+use std::fs::File;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::{cmp, fmt};
+use std::{cmp, fmt, io};
 
 use anyhow::ensure;
 use atty::Stream;
@@ -109,27 +111,44 @@ impl Default for RunBounds {
 }
 
 /// How to handle the output of benchmarked commands
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum CommandOutputPolicy {
-    /// Discard all output
-    Discard,
+    /// Redirect output to the null device
+    Null,
+
+    /// Feed output through a pipe before discarding it
+    Pipe,
+
+    /// Redirect output to a file
+    File(PathBuf),
 
     /// Show command output on the terminal
-    Forward,
+    Inherit,
 }
 
 impl Default for CommandOutputPolicy {
     fn default() -> Self {
-        CommandOutputPolicy::Discard
+        CommandOutputPolicy::Null
     }
 }
 
 impl CommandOutputPolicy {
-    pub fn get_stdout_stderr(&self) -> (Stdio, Stdio) {
-        match self {
-            CommandOutputPolicy::Discard => (Stdio::null(), Stdio::null()),
-            CommandOutputPolicy::Forward => (Stdio::inherit(), Stdio::inherit()),
-        }
+    pub fn get_stdout_stderr(&self) -> io::Result<(Stdio, Stdio)> {
+        let streams = match self {
+            CommandOutputPolicy::Null => (Stdio::null(), Stdio::null()),
+
+            // Typically only stdout is performance-relevant, so just pipe that
+            CommandOutputPolicy::Pipe => (Stdio::piped(), Stdio::null()),
+
+            CommandOutputPolicy::File(path) => {
+                let file = File::create(&path)?;
+                (file.into(), Stdio::null())
+            }
+
+            CommandOutputPolicy::Inherit => (Stdio::inherit(), Stdio::inherit()),
+        };
+
+        Ok(streams)
     }
 }
 
@@ -193,7 +212,7 @@ impl Default for Options {
             cleanup_command: None,
             output_style: OutputStyleOption::Full,
             executor_kind: ExecutorKind::default(),
-            command_output_policy: CommandOutputPolicy::Discard,
+            command_output_policy: CommandOutputPolicy::Null,
             time_unit: None,
         }
     }
@@ -250,9 +269,22 @@ impl Options {
         options.cleanup_command = matches.value_of("cleanup").map(String::from);
 
         options.command_output_policy = if matches.is_present("show-output") {
-            CommandOutputPolicy::Forward
+            CommandOutputPolicy::Inherit
+        } else if let Some(output) = matches.value_of("output") {
+            match output {
+                "null" => CommandOutputPolicy::Null,
+                "pipe" => CommandOutputPolicy::Pipe,
+                "inherit" => CommandOutputPolicy::Inherit,
+                arg => {
+                    let path = PathBuf::from(arg);
+                    if path.components().count() <= 1 {
+                        return Err(OptionsError::UnknownOutputPolicy(arg.to_string()));
+                    }
+                    CommandOutputPolicy::File(path)
+                }
+            }
         } else {
-            CommandOutputPolicy::Discard
+            CommandOutputPolicy::Null
         };
 
         options.output_style = match matches.value_of("style") {
@@ -262,12 +294,12 @@ impl Options {
             Some("color") => OutputStyleOption::Color,
             Some("none") => OutputStyleOption::Disabled,
             _ => {
-                if options.command_output_policy == CommandOutputPolicy::Discard
-                    && atty::is(Stream::Stdout)
+                if options.command_output_policy == CommandOutputPolicy::Inherit
+                    || !atty::is(Stream::Stdout)
                 {
-                    OutputStyleOption::Full
-                } else {
                     OutputStyleOption::Basic
+                } else {
+                    OutputStyleOption::Full
                 }
             }
         };

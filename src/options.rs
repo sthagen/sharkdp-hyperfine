@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::{cmp, fmt, io};
+use std::{cmp, env, fmt, io};
 
 use anyhow::ensure;
 use atty::Stream;
@@ -67,7 +67,7 @@ impl Shell {
 }
 
 /// Action to take when an executed command fails.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CmdFailureAction {
     /// Exit with an error message
     RaiseError,
@@ -77,7 +77,7 @@ pub enum CmdFailureAction {
 }
 
 /// Output style type option
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutputStyleOption {
     /// Do not output with colors or any special formatting
     Basic,
@@ -111,7 +111,7 @@ impl Default for RunBounds {
 }
 
 /// How to handle the output of benchmarked commands
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CommandOutputPolicy {
     /// Redirect output to the null device
     Null,
@@ -226,7 +226,7 @@ impl Options {
                 .value_of(param)
                 .map(|n| {
                     n.parse::<u64>()
-                        .map_err(|e| OptionsError::NumericParsingError(param, e))
+                        .map_err(|e| OptionsError::IntParsingError(param, e))
                 })
                 .transpose()
         };
@@ -298,6 +298,14 @@ impl Options {
                     || !atty::is(Stream::Stdout)
                 {
                     OutputStyleOption::Basic
+                } else if env::var_os("TERM")
+                    .map(|t| t == "unknown" || t == "dumb")
+                    .unwrap_or(true)
+                    || env::var_os("NO_COLOR")
+                        .map(|t| !t.is_empty())
+                        .unwrap_or(false)
+                {
+                    OutputStyleOption::NoColor
                 } else {
                     OutputStyleOption::Full
                 }
@@ -336,6 +344,12 @@ impl Options {
             Some("second") => Some(Unit::Second),
             _ => None,
         };
+
+        if let Some(time) = matches.value_of("min-benchmarking-time") {
+            options.min_benchmarking_time = time
+                .parse::<f64>()
+                .map_err(|e| OptionsError::FloatParsingError("min-benchmarking-time", e))?;
+        }
 
         Ok(options)
     }

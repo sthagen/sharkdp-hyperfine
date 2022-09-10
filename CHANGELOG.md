@@ -15,6 +15,24 @@
 ## Packaging
 
 
+
+
+# v1.15.0
+
+## Features
+
+- Disable colorized output in case of `TERM=dumb` or `NO_COLOR=1`, see #542 and #555 (@nabijaczleweli)
+- Add new (experimental) `--min-benchmarking-time <secs>` option, see #527 (@sharkdp)
+
+## Bugfixes
+
+- Fix user and kernel times on Windows, see #368 and #538 (@clemenswasser)
+
+## Other
+
+- Improve `--help` texts of `--export-*` options, see #506 and #522 (@Engineer-of-Efficiency)
+
+
 # v1.14.0
 
 ## Features

@@ -20,7 +20,7 @@ pub const DEFAULT_SHELL: &str = "sh";
 pub const DEFAULT_SHELL: &str = "cmd.exe";
 
 /// Shell to use for executing benchmarked commands
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Shell {
     /// Default shell command
     Default(&'static str),
@@ -300,7 +300,7 @@ impl Options {
                     OutputStyleOption::Basic
                 } else if env::var_os("TERM")
                     .map(|t| t == "unknown" || t == "dumb")
-                    .unwrap_or(true)
+                    .unwrap_or(!cfg!(target_os = "windows"))
                     || env::var_os("NO_COLOR")
                         .map(|t| !t.is_empty())
                         .unwrap_or(false)

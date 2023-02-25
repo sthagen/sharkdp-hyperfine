@@ -102,7 +102,7 @@ in question.
 
 If you want to run a benchmark *without an intermediate shell*, you can use the `-N` or `--shell=none`
 option. This is helpful for very fast commands (< 5 ms) where the shell startup overhead correction would
-produce a significant amount of noise. Note that you can not use shell syntax like `*` or `~` in this case.
+produce a significant amount of noise. Note that you cannot use shell syntax like `*` or `~` in this case.
 ```
 hyperfine -N 'grep TODO /home/user'
 ```
@@ -273,7 +273,7 @@ Download the corresponding archive from the [Release page](https://github.com/sh
 
 ## Alternative tools
 
-Hyperfine is inspired by [bench](https://github.com/Gabriel439/bench).
+Hyperfine is inspired by [bench](https://github.com/Gabriella439/bench).
 
 ## Integration with other tools
 

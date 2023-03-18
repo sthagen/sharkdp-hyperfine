@@ -79,19 +79,27 @@ impl ExportManager {
 
     /// Add an additional exporter to the ExportManager
     pub fn add_exporter(&mut self, export_type: ExportType, filename: &str) -> Result<()> {
-        let _ = File::create(filename)
-            .with_context(|| format!("Could not create export file '{}'", filename))?;
-
         let exporter: Box<dyn Exporter> = match export_type {
-            ExportType::Asciidoc => Box::new(AsciidocExporter::default()),
-            ExportType::Csv => Box::new(CsvExporter::default()),
-            ExportType::Json => Box::new(JsonExporter::default()),
-            ExportType::Markdown => Box::new(MarkdownExporter::default()),
-            ExportType::Orgmode => Box::new(OrgmodeExporter::default()),
+            ExportType::Asciidoc => Box::<AsciidocExporter>::default(),
+            ExportType::Csv => Box::<CsvExporter>::default(),
+            ExportType::Json => Box::<JsonExporter>::default(),
+            ExportType::Markdown => Box::<MarkdownExporter>::default(),
+            ExportType::Orgmode => Box::<OrgmodeExporter>::default(),
         };
+
         self.exporters.push(ExporterWithFilename {
             exporter,
-            filename: filename.to_string(),
+            filename: if filename == "-" {
+                if cfg!(windows) {
+                    "con:".to_string()
+                } else {
+                    "/dev/stdout".to_string()
+                }
+            } else {
+                let _ = File::create(filename)
+                    .with_context(|| format!("Could not create export file '{}'", filename))?;
+                filename.to_string()
+            },
         });
 
         Ok(())

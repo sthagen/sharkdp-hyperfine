@@ -216,6 +216,32 @@ fn runs_commands_using_user_defined_shell() {
 }
 
 #[test]
+fn can_pass_input_to_command_from_a_file() {
+    hyperfine()
+        .arg("--runs=1")
+        .arg("--input=example_input_file.txt")
+        .arg("--show-output")
+        .arg("cat")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("This text is part of a file"));
+}
+
+#[test]
+fn fails_if_invalid_stdin_data_file_provided() {
+    hyperfine()
+        .arg("--runs=1")
+        .arg("--input=example_non_existent_file.txt")
+        .arg("--show-output")
+        .arg("cat")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "The file 'example_non_existent_file.txt' specified as '--input' does not exist",
+        ));
+}
+
+#[test]
 fn returns_mean_time_in_correct_unit() {
     hyperfine_debug()
         .arg("sleep 1.234")

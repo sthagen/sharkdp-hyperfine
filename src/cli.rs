@@ -21,6 +21,7 @@ fn build_command() -> Command {
         .hide_possible_values(true)
         .about("A command-line benchmarking tool.")
         .help_expected(true)
+        .term_width(100)
         .arg(
             Arg::new("command")
                 .help("The command to benchmark. This can be the name of an executable, a command \
@@ -62,7 +63,7 @@ fn build_command() -> Command {
         .arg(
             Arg::new("runs")
                 .long("runs")
-                .conflicts_with_all(&["max-runs", "min-runs"])
+                .conflicts_with_all(["max-runs", "min-runs"])
                 .short('r')
                 .action(ArgAction::Set)
                 .value_name("NUM")
@@ -116,7 +117,7 @@ fn build_command() -> Command {
                 .short('P')
                 .action(ArgAction::Set)
                 .allow_hyphen_values(true)
-                .value_names(&["VAR", "MIN", "MAX"])
+                .value_names(["VAR", "MIN", "MAX"])
                 .help(
                     "Perform benchmark runs for each value in the range MIN..MAX. Replaces the \
                      string '{VAR}' in each command by the current parameter value.\n\n  \
@@ -133,7 +134,7 @@ fn build_command() -> Command {
                 .long("parameter-step-size")
                 .short('D')
                 .action(ArgAction::Set)
-                .value_names(&["DELTA"])
+                .value_names(["DELTA"])
                 .requires("parameter-scan")
                 .help(
                     "This argument requires --parameter-scan to be specified as well. \
@@ -148,8 +149,8 @@ fn build_command() -> Command {
                 .short('L')
                 .action(ArgAction::Append)
                 .allow_hyphen_values(true)
-                .value_names(&["VAR", "VALUES"])
-                .conflicts_with_all(&["parameter-scan", "parameter-step-size"])
+                .value_names(["VAR", "VALUES"])
+                .conflicts_with_all(["parameter-scan", "parameter-step-size"])
                 .help(
                     "Perform benchmark runs for each value in the comma-separated list VALUES. \
                      Replaces the string '{VAR}' in each command by the current parameter value\
@@ -193,7 +194,7 @@ fn build_command() -> Command {
             Arg::new("no-shell")
                 .short('N')
                 .action(ArgAction::SetTrue)
-                .conflicts_with_all(&["shell", "debug-mode"])
+                .conflicts_with_all(["shell", "debug-mode"])
                 .help("An alias for '--shell=none'.")
         )
         .arg(
@@ -274,15 +275,35 @@ fn build_command() -> Command {
                 .action(ArgAction::Set)
                 .value_name("WHERE")
                 .help(
-                    "Control where the output of the benchmark is redirected. <WHERE> can be:\n\n\
-                     null: Redirect output to /dev/null (the default). \
-                     Note that some programs like 'grep' detect when standard output is /dev/null \
-                     and apply certain optimizations. To avoid that, consider using \
-                     '--output=pipe'.\n\n\
-                     pipe: Feed the output through a pipe before discarding it.\n\n\
-                     inherit: Don't redirect the output at all (same as '--show-output').\n\n\
-                     <FILE>: Write the output to the given file.",
+                    "Control where the output of the benchmark is redirected. Note \
+                     that some programs like 'grep' detect when standard output is \
+                     /dev/null and apply certain optimizations. To avoid that, consider \
+                     using '--output=pipe'.\n\
+                     \n\
+                     <WHERE> can be:\n\
+                     \n  \
+                       null:     Redirect output to /dev/null (the default).\n\
+                     \n  \
+                       pipe:     Feed the output through a pipe before discarding it.\n\
+                     \n  \
+                       inherit:  Don't redirect the output at all (same as '--show-output').\n\
+                     \n  \
+                       <FILE>:   Write the output to the given file.",
                 ),
+        )
+        .arg(
+            Arg::new("input")
+                .long("input")
+                .action(ArgAction::Set)
+                .num_args(1)
+                .value_name("WHERE")
+                .help("Control where the input of the benchmark comes from.\n\
+                       \n\
+                       <WHERE> can be:\n\
+                       \n  \
+                         null:     Read from /dev/null (the default).\n\
+                       \n  \
+                         <FILE>:   Read the input from the given file."),
         )
         .arg(
             Arg::new("command-name")

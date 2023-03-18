@@ -110,10 +110,36 @@ impl Default for RunBounds {
     }
 }
 
+#[derive(Debug, Default, Clone, PartialEq)]
+pub enum CommandInputPolicy {
+    /// Read from the null device
+    #[default]
+    Null,
+
+    /// Read input from a file
+    File(PathBuf),
+}
+
+impl CommandInputPolicy {
+    pub fn get_stdin(&self) -> io::Result<Stdio> {
+        let stream: Stdio = match self {
+            CommandInputPolicy::Null => Stdio::null(),
+
+            CommandInputPolicy::File(path) => {
+                let file: File = File::open(path)?;
+                Stdio::from(file)
+            }
+        };
+
+        Ok(stream)
+    }
+}
+
 /// How to handle the output of benchmarked commands
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum CommandOutputPolicy {
     /// Redirect output to the null device
+    #[default]
     Null,
 
     /// Feed output through a pipe before discarding it
@@ -126,12 +152,6 @@ pub enum CommandOutputPolicy {
     Inherit,
 }
 
-impl Default for CommandOutputPolicy {
-    fn default() -> Self {
-        CommandOutputPolicy::Null
-    }
-}
-
 impl CommandOutputPolicy {
     pub fn get_stdout_stderr(&self) -> io::Result<(Stdio, Stdio)> {
         let streams = match self {
@@ -141,7 +161,7 @@ impl CommandOutputPolicy {
             CommandOutputPolicy::Pipe => (Stdio::piped(), Stdio::null()),
 
             CommandOutputPolicy::File(path) => {
-                let file = File::create(&path)?;
+                let file = File::create(path)?;
                 (file.into(), Stdio::null())
             }
 
@@ -193,10 +213,13 @@ pub struct Options {
     /// Determines how we run commands
     pub executor_kind: ExecutorKind,
 
+    /// Where input to the benchmarked command comes from
+    pub command_input_policy: CommandInputPolicy,
+
     /// What to do with the output of the benchmarked command
     pub command_output_policy: CommandOutputPolicy,
 
-    /// Which time unit to use when displaying resuls
+    /// Which time unit to use when displaying results
     pub time_unit: Option<Unit>,
 }
 
@@ -214,6 +237,7 @@ impl Default for Options {
             executor_kind: ExecutorKind::default(),
             command_output_policy: CommandOutputPolicy::Null,
             time_unit: None,
+            command_input_policy: CommandInputPolicy::Null,
         }
     }
 }
@@ -353,6 +377,18 @@ impl Options {
                 .parse::<f64>()
                 .map_err(|e| OptionsError::FloatParsingError("min-benchmarking-time", e))?;
         }
+
+        options.command_input_policy = if let Some(path_str) = matches.get_one::<String>("input") {
+            let path = PathBuf::from(path_str);
+            if !path.exists() {
+                return Err(OptionsError::StdinDataFileDoesNotExist(
+                    path_str.to_string(),
+                ));
+            }
+            CommandInputPolicy::File(path)
+        } else {
+            CommandInputPolicy::Null
+        };
 
         Ok(options)
     }

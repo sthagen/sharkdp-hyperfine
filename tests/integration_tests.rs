@@ -345,3 +345,56 @@ fn performs_all_benchmarks_in_parameter_scan() {
                 .and(predicate::str::contains("Benchmark 5: sleep 50").not()),
         );
 }
+
+#[test]
+fn intermediate_results_are_not_exported_to_stdout() {
+    hyperfine_debug()
+        .arg("--style=none") // To only see the Markdown export on stdout
+        .arg("--export-markdown")
+        .arg("-")
+        .arg("sleep 1")
+        .arg("sleep 2")
+        .assert()
+        .success()
+        .stdout(
+            (predicate::str::contains("sleep 1").count(1))
+                .and(predicate::str::contains("sleep 2").count(1)),
+        );
+}
+
+#[test]
+#[cfg(unix)]
+fn exports_intermediate_results_to_file() {
+    use tempfile::tempdir;
+
+    let tempdir = tempdir().unwrap();
+    let export_path = tempdir.path().join("results.md");
+
+    hyperfine()
+        .arg("--runs=1")
+        .arg("--export-markdown")
+        .arg(&export_path)
+        .arg("true")
+        .arg("false")
+        .assert()
+        .failure();
+
+    let contents = std::fs::read_to_string(export_path).unwrap();
+    assert!(contents.contains("true"));
+}
+
+#[test]
+fn unused_parameters_are_shown_in_benchmark_name() {
+    hyperfine()
+        .arg("--runs=2")
+        .arg("--parameter-list")
+        .arg("branch")
+        .arg("master,feature")
+        .arg("echo test")
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("echo test (branch = master)")
+                .and(predicate::str::contains("echo test (branch = feature)")),
+        );
+}

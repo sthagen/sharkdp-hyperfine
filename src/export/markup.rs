@@ -4,12 +4,13 @@ use crate::output::format::format_duration_value;
 use crate::util::units::Unit;
 
 use super::Exporter;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 
 pub enum Alignment {
     Left,
     Right,
 }
+
 pub trait MarkupExporter {
     fn table_results(&self, entries: &[BenchmarkResultWithRelativeSpeed], unit: Unit) -> String {
         // prepare table header strings
@@ -42,7 +43,9 @@ pub trait MarkupExporter {
         for entry in entries {
             let measurement = &entry.result;
             // prepare data row strings
-            let cmd_str = measurement.command.replace('|', "\\|");
+            let cmd_str = measurement
+                .command_with_unused_parameters
+                .replace('|', "\\|");
             let mean_str = format_duration_value(measurement.mean, Some(unit)).0;
             let stddev_str = if let Some(stddev) = measurement.stddev {
                 format!(" ± {}", format_duration_value(stddev, Some(unit)).0)
@@ -105,13 +108,8 @@ impl<T: MarkupExporter> Exporter for T {
     fn serialize(&self, results: &[BenchmarkResult], unit: Option<Unit>) -> Result<Vec<u8>> {
         let unit = unit.unwrap_or_else(|| determine_unit_from_results(results));
         let entries = relative_speed::compute(results);
-        if entries.is_none() {
-            return Err(anyhow!(
-                "Relative speed comparison is not available for markup exporter."
-            ));
-        }
 
-        let table = self.table_results(&entries.unwrap(), unit);
+        let table = self.table_results(&entries, unit);
         Ok(table.as_bytes().to_vec())
     }
 }
@@ -123,6 +121,7 @@ fn test_determine_unit_from_results_unit_given_s() {
     let results = vec![
         BenchmarkResult {
             command: String::from("sleep 2"),
+            command_with_unused_parameters: String::from("sleep 2"),
             mean: 2.0050,
             stddev: Some(0.0020),
             median: 2.0050,
@@ -136,6 +135,7 @@ fn test_determine_unit_from_results_unit_given_s() {
         },
         BenchmarkResult {
             command: String::from("sleep 0.1"),
+            command_with_unused_parameters: String::from("sleep 0.1"),
             mean: 0.1057,
             stddev: Some(0.0016),
             median: 0.1057,
@@ -163,6 +163,7 @@ fn test_determine_unit_from_results_unit_given_ms() {
     let results = vec![
         BenchmarkResult {
             command: String::from("sleep 2"),
+            command_with_unused_parameters: String::from("sleep 2"),
             mean: 2.0050,
             stddev: Some(0.0020),
             median: 2.0050,
@@ -176,6 +177,7 @@ fn test_determine_unit_from_results_unit_given_ms() {
         },
         BenchmarkResult {
             command: String::from("sleep 0.1"),
+            command_with_unused_parameters: String::from("sleep 0.1"),
             mean: 0.1057,
             stddev: Some(0.0016),
             median: 0.1057,
@@ -203,6 +205,7 @@ fn test_determine_unit_from_results_unit_first_s() {
     let results = vec![
         BenchmarkResult {
             command: String::from("sleep 2"),
+            command_with_unused_parameters: String::from("sleep 2"),
             mean: 2.0050,
             stddev: Some(0.0020),
             median: 2.0050,
@@ -216,6 +219,7 @@ fn test_determine_unit_from_results_unit_first_s() {
         },
         BenchmarkResult {
             command: String::from("sleep 0.1"),
+            command_with_unused_parameters: String::from("sleep 0.1"),
             mean: 0.1057,
             stddev: Some(0.0016),
             median: 0.1057,
@@ -243,6 +247,7 @@ fn test_determine_unit_from_results_unit_first_ms() {
     let results = vec![
         BenchmarkResult {
             command: String::from("sleep 0.1"),
+            command_with_unused_parameters: String::from("sleep 0.1"),
             mean: 0.1057,
             stddev: Some(0.0016),
             median: 0.1057,
@@ -256,6 +261,7 @@ fn test_determine_unit_from_results_unit_first_ms() {
         },
         BenchmarkResult {
             command: String::from("sleep 2"),
+            command_with_unused_parameters: String::from("sleep 2"),
             mean: 2.0050,
             stddev: Some(0.0020),
             median: 2.0050,

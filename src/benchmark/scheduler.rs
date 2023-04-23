@@ -44,10 +44,9 @@ impl<'a> Scheduler<'a> {
             self.results
                 .push(Benchmark::new(number, cmd, self.options, &*executor).run()?);
 
-            // We export (all results so far) after each individual benchmark, because
-            // we would risk losing all results if a later benchmark fails.
-            self.export_manager
-                .write_results(&self.results, self.options.time_unit)?;
+            // We export results after each individual benchmark, because
+            // we would risk losing them if a later benchmark fails.
+            self.export_manager.write_results(&self.results, true)?;
         }
 
         Ok(())
@@ -62,25 +61,28 @@ impl<'a> Scheduler<'a> {
             return;
         }
 
-        if let Some(mut annotated_results) = relative_speed::compute(&self.results) {
+        if let Some(mut annotated_results) = relative_speed::compute_with_check(&self.results) {
             annotated_results.sort_by(|l, r| relative_speed::compare_mean_time(l.result, r.result));
 
             let fastest = &annotated_results[0];
             let others = &annotated_results[1..];
 
             println!("{}", "Summary".bold());
-            println!("  '{}' ran", fastest.result.command.cyan());
+            println!(
+                "  {} ran",
+                fastest.result.command_with_unused_parameters.cyan()
+            );
 
             for item in others {
                 println!(
-                    "{}{} times faster than '{}'",
+                    "{}{} times faster than {}",
                     format!("{:8.2}", item.relative_speed).bold().green(),
                     if let Some(stddev) = item.relative_speed_stddev {
                         format!(" ± {}", format!("{:.2}", stddev).green())
                     } else {
                         "".into()
                     },
-                    &item.result.command.magenta()
+                    &item.result.command_with_unused_parameters.magenta()
                 );
             }
         } else {
@@ -88,10 +90,15 @@ impl<'a> Scheduler<'a> {
                 "{}: The benchmark comparison could not be computed as some benchmark times are zero. \
                  This could be caused by background interference during the initial calibration phase \
                  of hyperfine, in combination with very fast commands (faster than a few milliseconds). \
-                 Try to re-run the benchmark on a quiet system. If it does not help, you command is \
-                 most likely too fast to be accurately benchmarked by hyperfine.",
+                 Try to re-run the benchmark on a quiet system. If you did not do so already, try the \
+                 --shell=none/-N option. If it does not help either, you command is most likely too fast \
+                 to be accurately benchmarked by hyperfine.",
                  "Note".bold().red()
             );
         }
+    }
+
+    pub fn final_export(&self) -> Result<()> {
+        self.export_manager.write_results(&self.results, false)
     }
 }

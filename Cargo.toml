@@ -3,14 +3,14 @@ authors = ["David Peter <mail@david-peter.de>"]
 categories = ["command-line-utilities"]
 description = "A command-line benchmarking tool"
 homepage = "https://github.com/sharkdp/hyperfine"
-license = "MIT/Apache-2.0"
+license = "MIT OR Apache-2.0"
 name = "hyperfine"
 readme = "README.md"
 repository = "https://github.com/sharkdp/hyperfine"
 version = "1.17.0"
 edition = "2018"
 build = "build.rs"
-rust-version = "1.65.0"
+rust-version = "1.66.0"
 
 [features]
 # Use the nightly feature windows_process_extensions_main_thread_handle

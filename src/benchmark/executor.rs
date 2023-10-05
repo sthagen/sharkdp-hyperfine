@@ -1,3 +1,5 @@
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::process::ExitStatus;
 
 use crate::command::Command;
@@ -133,16 +135,17 @@ impl<'a> Executor for ShellExecutor<'a> {
         command: &Command<'_>,
         command_failure_action: Option<CmdFailureAction>,
     ) -> Result<(TimingResult, ExitStatus)> {
+        let on_windows_cmd = cfg!(windows) && *self.shell == Shell::Default("cmd.exe");
         let mut command_builder = self.shell.command();
-        command_builder
-            .arg(
-                if cfg!(windows) && *self.shell == Shell::Default("cmd.exe") {
-                    "/C"
-                } else {
-                    "-c"
-                },
-            )
-            .arg(command.get_command_line());
+        command_builder.arg(if on_windows_cmd { "/C" } else { "-c" });
+
+        // Windows needs special treatment for its behavior on parsing cmd arguments
+        if on_windows_cmd {
+            #[cfg(windows)]
+            command_builder.raw_arg(command.get_command_line());
+        } else {
+            command_builder.arg(command.get_command_line());
+        }
 
         let mut result = run_command_and_measure_common(
             command_builder,

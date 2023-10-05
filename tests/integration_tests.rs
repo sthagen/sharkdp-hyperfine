@@ -261,6 +261,15 @@ fn returns_mean_time_in_correct_unit() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Time (mean ± σ):     1234.0 ms ±"));
+
+    hyperfine_debug()
+        .arg("--time-unit=microsecond")
+        .arg("sleep 1.234")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Time (mean ± σ):     1234000.0 µs ±",
+        ));
 }
 
 #[test]
@@ -422,4 +431,22 @@ fn speed_comparison_sort_order() {
         .stdout(predicate::str::contains(
             "2.00 ±  0.00  sleep 2\n        1.00          sleep 1",
         ));
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_quote_args() {
+    hyperfine()
+        .arg("more \"example_input_file.txt\"")
+        .assert()
+        .success();
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_quote_before_quote_args() {
+    hyperfine()
+        .arg("dir \"..\\src\\\" \"..\\tests\\\"")
+        .assert()
+        .success();
 }

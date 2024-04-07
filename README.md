@@ -206,7 +206,7 @@ apk add hyperfine
 
 ### On Arch Linux
 
-On Arch Linux, hyperfine can be installed [from the official repositories](https://www.archlinux.org/packages/community/x86_64/hyperfine/):
+On Arch Linux, hyperfine can be installed [from the official repositories](https://archlinux.org/packages/extra/x86_64/hyperfine/):
 ```
 pacman -S hyperfine
 ```
@@ -216,6 +216,14 @@ pacman -S hyperfine
 On Debian Linux, hyperfine can be installed [from the testing repositories](https://packages.debian.org/testing/main/hyperfine)
 ```
 apt install hyperfine
+```
+
+### On Exherbo Linux
+
+On Exherbo Linux, hyperfine can be installed [from the rust repositories]([https://packages.debian.org/testing/main/hyperfine](https://gitlab.exherbo.org/exherbo/rust/-/tree/master/packages/sys-apps/hyperfine)
+```
+cave resolve -x repository/rust
+cave resolve -x hyperfine
 ```
 
 ### On Funtoo Linux

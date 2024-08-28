@@ -1,12 +1,20 @@
 #!/usr/bin/env python
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#     "matplotlib",
+#     "pyqt6",
+# ]
+# ///
 
 """This program shows parametrized `hyperfine` benchmark results as an
 errorbar plot."""
 
 import argparse
 import json
-import matplotlib.pyplot as plt
 import sys
+
+import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("file", help="JSON file with benchmark results", nargs="+")
@@ -25,9 +33,7 @@ parser.add_argument(
 parser.add_argument(
     "--titles", help="Comma-separated list of titles for the plot legend"
 )
-parser.add_argument(
-    "-o", "--output", help="Save image to the given filename."
-)
+parser.add_argument("-o", "--output", help="Save image to the given filename.")
 
 args = parser.parse_args()
 if args.parameter_name is not None:
@@ -38,7 +44,7 @@ if args.parameter_name is not None:
 
 
 def die(msg):
-    sys.stderr.write("fatal: %s\n" % (msg,))
+    sys.stderr.write(f"fatal: {msg}\n")
     sys.exit(1)
 
 
@@ -50,8 +56,7 @@ def extract_parameters(results):
     names = frozenset(names)
     if len(names) != 1:
         die(
-            "benchmarks must all have the same parameter name, but found: %s"
-            % sorted(names)
+            f"benchmarks must all have the same parameter name, but found: {sorted(names)}"
         )
     return (next(iter(names)), list(values))
 
@@ -63,8 +68,7 @@ def unique_parameter(benchmark):
         die("benchmarks must have exactly one parameter, but found none")
     if len(params_dict) > 1:
         die(
-            "benchmarks must have exactly one parameter, but found multiple: %s"
-            % sorted(params_dict)
+            f"benchmarks must have exactly one parameter, but found multiple: {sorted(params_dict)}"
         )
     [(name, value)] = params_dict.items()
     return (name, float(value))
@@ -79,8 +83,7 @@ for filename in args.file:
     (this_parameter_name, parameter_values) = extract_parameters(results)
     if parameter_name is not None and this_parameter_name != parameter_name:
         die(
-            "files must all have the same parameter name, but found %r vs. %r"
-            % (parameter_name, this_parameter_name)
+            f"files must all have the same parameter name, but found {parameter_name!r} vs. {this_parameter_name!r}"
         )
     parameter_name = this_parameter_name
 
